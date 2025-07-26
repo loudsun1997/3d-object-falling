@@ -8,17 +8,112 @@ import { CSS2DRenderer, CSS2DObject } from 'https://cdn.skypack.dev/three@0.128.
  * @description Script for creating a falling 3D objects effect with Three.js.
  * @author AI Coding Agent
  * @date July 25, 2025
- * This file contains a step-by-step plan to be implemented.
  */
+
+// ========================================
+// CONFIGURATION PARAMETERS
+// ========================================
+// All tunable parameters are centralized here for easy modification
+
+// --- SCENE SETTINGS ---
+const BACKGROUND_COLOR = 0x6b2d5c; // Deep purple background color
+
+// --- CAMERA SETTINGS ---
+const CAMERA_FOV = 75; // Field of view in degrees
+const CAMERA_NEAR = 0.1; // Near clipping plane
+const CAMERA_FAR = 3000; // Far clipping plane
+const CAMERA_POSITION_Z = 35; // Initial camera Z position
+
+// --- OBJECT SETTINGS ---
+const OBJECT_COUNT = 500; // Total number of falling objects
+const MODEL_PATH = 'models/dd.glb'; // Path to the 3D model file
+
+// --- OBJECT COLORS ---
+// Colors randomly assigned to falling objects (excluding background color)
+const OBJECT_COLORS = [
+    0xf0386b, // Pink
+    0xff5376, // Coral pink
+    0xf8c0c8, // Light pink
+    0xe2c290  // Beige/gold
+];
+
+// --- OBJECT SPREAD PARAMETERS ---
+const X_SPREAD = 850; // Horizontal spread of objects
+const Y_SPREAD = 850; // Vertical spread of objects
+const Z_SPREAD = 1200; // Depth spread of objects
+const Y_OFFSET = 0; // Vertical offset for starting positions
+
+// --- OBJECT SCALE PARAMETERS ---
+const MIN_SCALE = 0.02; // Minimum object scale
+const MAX_SCALE = 0.1; // Maximum object scale
+
+// --- ANIMATION PARAMETERS ---
+const FALL_SPEED = 0.8; // How fast objects fall (higher = faster)
+const MAX_ROTATION_SPEED = 0.5; // Maximum rotation speed for objects
+const ROTATION_MULTIPLIER = 0.02; // Rotation speed multiplier
+
+// --- MATERIAL PROPERTIES ---
+const MATERIAL_METALNESS = 0.6; // Material metalness (0-1)
+const MATERIAL_ROUGHNESS = 0.4; // Material roughness (0-1)
+
+// --- LIGHTING SETTINGS ---
+// Ambient Light
+const AMBIENT_LIGHT_COLOR = 0xffffff;
+const AMBIENT_LIGHT_INTENSITY = 0.5;
+
+// Main Directional Light
+const DIR_LIGHT_1_COLOR = 0xffffff;
+const DIR_LIGHT_1_INTENSITY = 1;
+const DIR_LIGHT_1_POSITION = [5, 5, 5];
+
+// Secondary Directional Light (cool tone)
+const DIR_LIGHT_2_COLOR = 0x87CEEB; // Sky blue
+const DIR_LIGHT_2_INTENSITY = 0.6;
+const DIR_LIGHT_2_POSITION = [-5, 3, 2];
+
+// Third Directional Light (warm tone)
+const DIR_LIGHT_3_COLOR = 0xFFB347; // Warm orange
+const DIR_LIGHT_3_INTENSITY = 0.4;
+const DIR_LIGHT_3_POSITION = [0, -3, 5];
+
+// Point Light 1
+const POINT_LIGHT_1_COLOR = 0xFF69B4; // Hot pink
+const POINT_LIGHT_1_INTENSITY = 0.8;
+const POINT_LIGHT_1_DISTANCE = 100;
+const POINT_LIGHT_1_POSITION = [10, 10, 10];
+
+// Point Light 2
+const POINT_LIGHT_2_COLOR = 0x00CED1; // Dark turquoise
+const POINT_LIGHT_2_INTENSITY = 0.6;
+const POINT_LIGHT_2_DISTANCE = 80;
+const POINT_LIGHT_2_POSITION = [-10, -5, -10];
+
+// Spot Light
+const SPOT_LIGHT_COLOR = 0xFFFFFF; // White
+const SPOT_LIGHT_INTENSITY = 1.5;
+const SPOT_LIGHT_ANGLE = Math.PI / 8;
+const SPOT_LIGHT_PENUMBRA = 0.2;
+const SPOT_LIGHT_POSITION = [0, 20, 0];
+const SPOT_LIGHT_TARGET = [0, 0, 0];
+
+// --- VISUAL HELPERS ---
+const SHOW_AXES_HELPER = true; // Show XYZ axes
+const AXES_HELPER_SIZE = 10; // Size of axes helper
+const SHOW_AXIS_LABELS = true; // Show X, Y, Z labels
+
+// --- CONTROLS ---
+const ENABLE_ORBIT_CONTROLS = true; // Enable camera orbit controls
+const ENABLE_DAMPING = true; // Enable smooth camera movement
+
+// ========================================
+// MAIN APPLICATION CODE
+// ========================================
 
 // --- GLOBAL CONTEXT ---
 // The goal is to create a full-screen animation where 3D objects fall from the sky,
 // rotate, and loop endlessly. This script will handle all the 3D logic.
-// The user has already created the index.html and style.css files.
 
-// --- PHASE 1: BASIC SCENE FOUNDATION (CONTINUED) ---
-
-// ✅ Task 1.3: Initialize Three.js
+// --- PHASE 1: BASIC SCENE FOUNDATION ---
 
 // 1. Get a reference to the canvas element with the class 'webgl' from the HTML.
 const canvas = document.querySelector('canvas.webgl');
@@ -33,83 +128,104 @@ const sizes = {
 };
 
 // 4. Create a PerspectiveCamera.
-//    - Field of View (FOV): 75 is a good default.
-//    - Aspect Ratio: window width / window height.
-//    - Near/Far clipping plane: 0.1 and 1000 (Increased far plane).
-const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 3000);
-//    - Set the camera's initial position so it's not at the center of the scene.
-camera.position.z = 35;
+const camera = new THREE.PerspectiveCamera(CAMERA_FOV, sizes.width / sizes.height, CAMERA_NEAR, CAMERA_FAR);
+camera.position.z = CAMERA_POSITION_Z;
 scene.add(camera);
 
 // 5. Create a WebGLRenderer.
-//    - Pass the canvas element to it.
-//    - Set antialias to true for smoother edges.
 const renderer = new THREE.WebGLRenderer({
     canvas: canvas,
     antialias: true,
-    alpha: true // Make the background transparent if needed
+    alpha: true
 });
-//    - Set the renderer's size to match our defined dimensions.
 renderer.setSize(sizes.width, sizes.height);
-//    - Set the pixel ratio for sharper images on high-resolution screens.
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-//    - Set a clear color (or leave transparent if alpha is true).
-renderer.setClearColor(0x111111); // A dark gray background
+renderer.setClearColor(BACKGROUND_COLOR);
 
 // Add a renderer for CSS 2D labels
 const labelRenderer = new CSS2DRenderer();
 labelRenderer.setSize(window.innerWidth, window.innerHeight);
 labelRenderer.domElement.style.position = 'absolute';
 labelRenderer.domElement.style.top = '0px';
-labelRenderer.domElement.style.pointerEvents = 'none'; // So controls aren't blocked
+labelRenderer.domElement.style.pointerEvents = 'none';
 document.body.appendChild(labelRenderer.domElement);
 
-// Add AxesHelper for visualizing the XYZ axes
-const axesHelper = new THREE.AxesHelper(10); // The number defines the size of the axes
-scene.add(axesHelper);
+// Add AxesHelper for visualizing the XYZ axes (if enabled)
+if (SHOW_AXES_HELPER) {
+    const axesHelper = new THREE.AxesHelper(AXES_HELPER_SIZE);
+    scene.add(axesHelper);
+}
 
-// Create labels for the axes
-const p = document.createElement('p');
-p.className = 'label';
+// Create labels for the axes (if enabled)
+if (SHOW_AXIS_LABELS) {
+    const p = document.createElement('p');
+    p.className = 'label';
 
-const xLabel = new CSS2DObject(p.cloneNode(true));
-xLabel.element.textContent = 'X';
-xLabel.element.style.color = '#ff0000';
-xLabel.position.set(11, 0, 0);
-scene.add(xLabel);
+    const xLabel = new CSS2DObject(p.cloneNode(true));
+    xLabel.element.textContent = 'X';
+    xLabel.element.style.color = '#ff0000';
+    xLabel.position.set(AXES_HELPER_SIZE + 1, 0, 0);
+    scene.add(xLabel);
 
-const yLabel = new CSS2DObject(p.cloneNode(true));
-yLabel.element.textContent = 'Y';
-yLabel.element.style.color = '#00ff00';
-yLabel.position.set(0, 11, 0);
-scene.add(yLabel);
+    const yLabel = new CSS2DObject(p.cloneNode(true));
+    yLabel.element.textContent = 'Y';
+    yLabel.element.style.color = '#00ff00';
+    yLabel.position.set(0, AXES_HELPER_SIZE + 1, 0);
+    scene.add(yLabel);
 
-const zLabel = new CSS2DObject(p.cloneNode(true));
-zLabel.element.textContent = 'Z';
-zLabel.element.style.color = '#0000ff';
-zLabel.position.set(0, 0, 11);
-scene.add(zLabel);
+    const zLabel = new CSS2DObject(p.cloneNode(true));
+    zLabel.element.textContent = 'Z';
+    zLabel.element.style.color = '#0000ff';
+    zLabel.position.set(0, 0, AXES_HELPER_SIZE + 1);
+    scene.add(zLabel);
+}
 
-// 7. Add OrbitControls for camera interaction
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // Adds a smooth inertia effect
+// 7. Add OrbitControls for camera interaction (if enabled)
+let controls;
+if (ENABLE_ORBIT_CONTROLS) {
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = ENABLE_DAMPING;
+}
 
 // 6. Add lighting to the scene.
-//    - Create an AmbientLight for basic overall illumination (color: 0xffffff, intensity: 0.5).
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+// Ambient Light
+const ambientLight = new THREE.AmbientLight(AMBIENT_LIGHT_COLOR, AMBIENT_LIGHT_INTENSITY);
 scene.add(ambientLight);
-//    - Create a DirectionalLight for highlights and shadows.
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(5, 5, 5); // Position it to cast light from the top-right.
+
+// Main Directional Light
+const directionalLight = new THREE.DirectionalLight(DIR_LIGHT_1_COLOR, DIR_LIGHT_1_INTENSITY);
+directionalLight.position.set(...DIR_LIGHT_1_POSITION);
 scene.add(directionalLight);
+
+// Secondary Directional Light (cool tone)
+const directionalLight2 = new THREE.DirectionalLight(DIR_LIGHT_2_COLOR, DIR_LIGHT_2_INTENSITY);
+directionalLight2.position.set(...DIR_LIGHT_2_POSITION);
+scene.add(directionalLight2);
+
+// Third Directional Light (warm tone)
+const directionalLight3 = new THREE.DirectionalLight(DIR_LIGHT_3_COLOR, DIR_LIGHT_3_INTENSITY);
+directionalLight3.position.set(...DIR_LIGHT_3_POSITION);
+scene.add(directionalLight3);
+
+// Point Light 1
+const pointLight1 = new THREE.PointLight(POINT_LIGHT_1_COLOR, POINT_LIGHT_1_INTENSITY, POINT_LIGHT_1_DISTANCE);
+pointLight1.position.set(...POINT_LIGHT_1_POSITION);
+scene.add(pointLight1);
+
+// Point Light 2
+const pointLight2 = new THREE.PointLight(POINT_LIGHT_2_COLOR, POINT_LIGHT_2_INTENSITY, POINT_LIGHT_2_DISTANCE);
+pointLight2.position.set(...POINT_LIGHT_2_POSITION);
+scene.add(pointLight2);
+
+// Spot Light
+const spotLight = new THREE.SpotLight(SPOT_LIGHT_COLOR, SPOT_LIGHT_INTENSITY, 0, SPOT_LIGHT_ANGLE, SPOT_LIGHT_PENUMBRA);
+spotLight.position.set(...SPOT_LIGHT_POSITION);
+spotLight.target.position.set(...SPOT_LIGHT_TARGET);
+scene.add(spotLight);
+scene.add(spotLight.target);
 
 
 // --- PHASE 2: SPAWNING THE OBJECTS ---
-
-// ✅ Task 2.1 & 2.2: Load the Model and Implement Instancing
-
-// Define the number of objects to create.
-const objectCount = 300;
 
 // Create a new GLTFLoader instance.
 const gltfLoader = new GLTFLoader();
@@ -119,7 +235,7 @@ const dummy = new THREE.Object3D();
 
 // Load the .glb file from the 'models' folder.
 gltfLoader.load(
-    'models/dd.glb',
+    MODEL_PATH,
     (gltf) => {
         // This function runs when the model has successfully loaded.
         console.log('Model loaded successfully');
@@ -137,53 +253,53 @@ gltfLoader.load(
             return; // Stop if no geometry is found
         }
 
-        // 2. Create a material for the objects. MeshStandardMaterial works well with lights.
+        // Create a material for the objects.
         const modelMaterial = new THREE.MeshStandardMaterial({
-            metalness: 0.6,
-            roughness: 0.4,
-            color: 0xcccccc // A light gray color
+            metalness: MATERIAL_METALNESS,
+            roughness: MATERIAL_ROUGHNESS,
+            color: 0xffffff // Base white color, will be tinted by instance colors
         });
 
-        // 3. Create the InstancedMesh.
-        //    - Pass the geometry, material, and the total count.
-        const instancedMesh = new THREE.InstancedMesh(modelGeometry, modelMaterial, objectCount);
+        // Create the InstancedMesh.
+        const instancedMesh = new THREE.InstancedMesh(modelGeometry, modelMaterial, OBJECT_COUNT);
+        
+        // Create color array for instanced mesh
+        const colorArray = new Float32Array(OBJECT_COUNT * 3);
+        
         scene.add(instancedMesh);
 
         // Create an array to hold the state of each object
         const objects = [];
 
-        // Define tunable parameters for the spread
-        const xSpread = 550; // Tune this value to change the horizontal spread
-        const ySpread = 850; // Tune this value to change the vertical spread
-        const zSpread = 1200; // Tune this value to change the depth spread
-
-        // Add tunable scale parameters
-        const minScale = 0.02; // The smallest an object can be
-        const maxScale = 0.1;  // The largest an object can be
-
-        const yOffset = 0; // Tune this value to shift the starting Y position
-
-        // 4. Set initial positions and rotations for each instance.
-        //    - Use a loop from 0 to objectCount.
-        for (let i = 0; i < objectCount; i++) {
+        // Set initial positions and rotations for each instance.
+        for (let i = 0; i < OBJECT_COUNT; i++) {
             // Store state for each object
             const objectState = {
                 position: new THREE.Vector3(
-                    (Math.random() - 0.5) * xSpread,
-                    yOffset + (Math.random() - 0.5) * ySpread,
-                    (Math.random() - 0.5) * zSpread
+                    (Math.random() - 0.5) * X_SPREAD,
+                    Y_OFFSET + (Math.random() - 0.5) * Y_SPREAD,
+                    (Math.random() - 0.5) * Z_SPREAD
                 ),
                 rotation: new THREE.Euler(
                     Math.random() * Math.PI,
                     Math.random() * Math.PI,
                     Math.random() * Math.PI
                 ),
-                scale: Math.random() * (maxScale - minScale) + minScale,
+                scale: Math.random() * (MAX_SCALE - MIN_SCALE) + MIN_SCALE,
                 // Add random rotation speeds for each object
-                rotationSpeedX: (Math.random() - 0.5) * 0.5,
-                rotationSpeedZ: (Math.random() - 0.5) * 0.5
+                rotationSpeedX: (Math.random() - 0.5) * MAX_ROTATION_SPEED,
+                rotationSpeedZ: (Math.random() - 0.5) * MAX_ROTATION_SPEED
             };
             objects.push(objectState);
+
+            // Randomly assign one of the 4 colors to this instance
+            const randomColor = OBJECT_COLORS[Math.floor(Math.random() * OBJECT_COLORS.length)];
+            const color = new THREE.Color(randomColor);
+            
+            // Set the color in the color array
+            colorArray[i * 3] = color.r;
+            colorArray[i * 3 + 1] = color.g;
+            colorArray[i * 3 + 2] = color.b;
 
             // Set initial matrix for the instanced mesh
             dummy.position.copy(objectState.position);
@@ -192,6 +308,9 @@ gltfLoader.load(
             dummy.updateMatrix();
             instancedMesh.setMatrixAt(i, dummy.matrix);
         }
+        
+        // Apply the instance colors to the mesh
+        instancedMesh.instanceColor = new THREE.InstancedBufferAttribute(colorArray, 3);
         
         // Let Three.js know the instance matrices have been updated.
         instancedMesh.instanceMatrix.needsUpdate = true;
@@ -205,22 +324,22 @@ gltfLoader.load(
             const elapsedTime = clock.getElapsedTime();
 
             // Loop through each instance to update it.
-            for (let i = 0; i < objectCount; i++) {
+            for (let i = 0; i < OBJECT_COUNT; i++) {
                 const obj = objects[i];
 
                 // Update position (make it fall).
-                obj.position.y -= 0.8;
+                obj.position.y -= FALL_SPEED;
 
                 // Update rotation using individual speeds
-                obj.rotation.x += obj.rotationSpeedX * 0.02;
-                obj.rotation.z += obj.rotationSpeedZ * 0.02;
+                obj.rotation.x += obj.rotationSpeedX * ROTATION_MULTIPLIER;
+                obj.rotation.z += obj.rotationSpeedZ * ROTATION_MULTIPLIER;
 
                 // Check if object is off-screen (recycling).
-                const recycleThreshold = yOffset - ySpread / 2 - 10;
+                const recycleThreshold = Y_OFFSET - Y_SPREAD / 2 - 10;
                 if (obj.position.y < recycleThreshold) {
-                    obj.position.y = yOffset + ySpread / 2;
-                    obj.position.x = (Math.random() - 0.5) * xSpread;
-                    obj.position.z = (Math.random() - 0.5) * zSpread;
+                    obj.position.y = Y_OFFSET + Y_SPREAD / 2;
+                    obj.position.x = (Math.random() - 0.5) * X_SPREAD;
+                    obj.position.z = (Math.random() - 0.5) * Z_SPREAD;
                 }
 
                 // Update the dummy object and the instance matrix
@@ -233,8 +352,10 @@ gltfLoader.load(
             // Tell Three.js that the matrices need to be updated on the GPU.
             instancedMesh.instanceMatrix.needsUpdate = true;
 
-            // Update the controls
-            controls.update();
+            // Update the controls (if enabled)
+            if (controls) {
+                controls.update();
+            }
 
             // Render the scene with the updated camera.
             renderer.render(scene, camera);
@@ -254,70 +375,9 @@ gltfLoader.load(
     }
 );
 
-
-// --- PHASE 3: BRINGING IT TO LIFE (ANIMATION) ---
-
-// Create a clock to manage animation timing.
-// const clock = new THREE.Clock();
-
-// ✅ Task 3.1: Create the Animation Loop
-// const animate = () => {
-//     const elapsedTime = clock.getElapsedTime();
-
-//     // ✅ Task 3.2 & 3.3: Implement Falling, Rotation, and Recycling
-    
-//     // Check if the instancedMesh exists before trying to animate it.
-//     const instancedMesh = scene.getObjectByProperty('isInstancedMesh', true);
-//     if (instancedMesh) {
-//         // Loop through each instance to update it.
-//         for (let i = 0; i < objectCount; i++) {
-//             // Get the current matrix of the instance.
-//             instancedMesh.getMatrixAt(i, dummy.matrix);
-            
-//             // Decompose the matrix into position, quaternion, and scale.
-//             dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
-
-//             // Update position (make it fall).
-//             dummy.position.y -= 0.02; // Adjust this value for fall speed.
-
-//             // Update rotation - Set rotation based on elapsed time for smooth animation
-//             dummy.rotation.x = elapsedTime * 0.3;
-//             dummy.rotation.z = elapsedTime * 0.3;
-
-
-//             // Check if object is off-screen (recycling).
-//             const recycleThreshold = yOffset - ySpread / 2 - 10; // Adjusted for offset
-//             if (dummy.position.y < recycleThreshold) {
-//                 dummy.position.y = yOffset + ySpread / 2; // Reset to top of spread area
-//                 dummy.position.x = (Math.random() - 0.5) * xSpread; // Re-randomize horizontal position
-//                 dummy.position.z = (Math.random() - 0.5) * zSpread; // Re-randomize depth position
-//             }
-
-//             // Recompose the matrix from the updated properties.
-//             dummy.updateMatrix();
-
-//             // Set the new matrix for the instance.
-//             instancedMesh.setMatrixAt(i, dummy.matrix);
-//         }
-//         // Tell Three.js that the matrices need to be updated on the GPU.
-//         instancedMesh.instanceMatrix.needsUpdate = true;
-
-//         // Update the controls
-//         controls.update();
-
-//         // Render the scene with the updated camera.
-//         renderer.render(scene, camera);
-//         labelRenderer.render(scene, camera);
-
-//         // Call animate again on the next frame.
-//         window.requestAnimationFrame(animate);
-//     }
-// };
-
-
 // --- PHASE 4: REFINEMENT & POLISH ---
 
-// ✅ Task 4.1: Handle Window Resizing
+// Handle Window Resizing
 window.addEventListener('resize', () => {
     // Update sizes object
     sizes.width = window.innerWidth;

@@ -35,8 +35,8 @@ const sizes = {
 // 4. Create a PerspectiveCamera.
 //    - Field of View (FOV): 75 is a good default.
 //    - Aspect Ratio: window width / window height.
-//    - Near/Far clipping plane: 0.1 and 100.
-const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100);
+//    - Near/Far clipping plane: 0.1 and 1000 (Increased far plane).
+const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 3000);
 //    - Set the camera's initial position so it's not at the center of the scene.
 camera.position.z = 35;
 scene.add(camera);
@@ -109,7 +109,7 @@ scene.add(directionalLight);
 // ✅ Task 2.1 & 2.2: Load the Model and Implement Instancing
 
 // Define the number of objects to create.
-const objectCount = 50;
+const objectCount = 300;
 
 // Create a new GLTFLoader instance.
 const gltfLoader = new GLTFLoader();
@@ -123,7 +123,6 @@ gltfLoader.load(
     (gltf) => {
         // This function runs when the model has successfully loaded.
         console.log('Model loaded successfully');
-        console.log('GLTF Scene:', gltf.scene); // Log the scene structure for debugging
 
         let modelGeometry;
         // Traverse the loaded scene to find the first mesh
@@ -150,31 +149,47 @@ gltfLoader.load(
         const instancedMesh = new THREE.InstancedMesh(modelGeometry, modelMaterial, objectCount);
         scene.add(instancedMesh);
 
+        // Create an array to hold the state of each object
+        const objects = [];
+
+        // Define tunable parameters for the spread
+        const xSpread = 550; // Tune this value to change the horizontal spread
+        const ySpread = 850; // Tune this value to change the vertical spread
+        const zSpread = 1200; // Tune this value to change the depth spread
+
+        // Add tunable scale parameters
+        const minScale = 0.02; // The smallest an object can be
+        const maxScale = 0.1;  // The largest an object can be
+
+        const yOffset = 0; // Tune this value to shift the starting Y position
+
         // 4. Set initial positions and rotations for each instance.
         //    - Use a loop from 0 to objectCount.
         for (let i = 0; i < objectCount; i++) {
-            // Randomize position
-            dummy.position.set(
-                (Math.random() - 0.5) * 30, // x: spread out horizontally
-                (Math.random() - 0.5) * 30, // y: spread out vertically
-                (Math.random() - 0.5) * 20  // z: spread out in depth
-            );
+            // Store state for each object
+            const objectState = {
+                position: new THREE.Vector3(
+                    (Math.random() - 0.5) * xSpread,
+                    yOffset + (Math.random() - 0.5) * ySpread,
+                    (Math.random() - 0.5) * zSpread
+                ),
+                rotation: new THREE.Euler(
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI
+                ),
+                scale: Math.random() * (maxScale - minScale) + minScale,
+                // Add random rotation speeds for each object
+                rotationSpeedX: (Math.random() - 0.5) * 0.5,
+                rotationSpeedZ: (Math.random() - 0.5) * 0.5
+            };
+            objects.push(objectState);
 
-            // Randomize rotation
-            dummy.rotation.set(
-                Math.random() * Math.PI,
-                Math.random() * Math.PI,
-                Math.random() * Math.PI
-            );
-            
-            // Randomize scale - Made objects much smaller
-            const scale = Math.random() * 0.005 + 0.002; // scale between 0.02 and 0.07
-            dummy.scale.set(scale, scale, scale);
-
-            // Apply these transformations to the dummy object's matrix.
+            // Set initial matrix for the instanced mesh
+            dummy.position.copy(objectState.position);
+            dummy.rotation.copy(objectState.rotation);
+            dummy.scale.set(objectState.scale, objectState.scale, objectState.scale);
             dummy.updateMatrix();
-
-            // Set the matrix for the i-th instance.
             instancedMesh.setMatrixAt(i, dummy.matrix);
         }
         
@@ -191,30 +206,28 @@ gltfLoader.load(
 
             // Loop through each instance to update it.
             for (let i = 0; i < objectCount; i++) {
-                // Get the current matrix of the instance.
-                instancedMesh.getMatrixAt(i, dummy.matrix);
-                
-                // Decompose the matrix into position, quaternion, and scale.
-                dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+                const obj = objects[i];
 
                 // Update position (make it fall).
-                dummy.position.y -= 0.02; // Adjust this value for fall speed.
+                obj.position.y -= 0.8;
 
-                // Update rotation - Set rotation based on elapsed time for smooth animation
-                dummy.rotation.x = elapsedTime * 0.3;
-                dummy.rotation.z = elapsedTime * 0.3;
-
+                // Update rotation using individual speeds
+                obj.rotation.x += obj.rotationSpeedX * 0.02;
+                obj.rotation.z += obj.rotationSpeedZ * 0.02;
 
                 // Check if object is off-screen (recycling).
-                if (dummy.position.y < -15) {
-                    dummy.position.y = 15; // Reset to the top.
-                    dummy.position.x = (Math.random() - 0.5) * 30; // Re-randomize horizontal position.
+                const recycleThreshold = yOffset - ySpread / 2 - 10;
+                if (obj.position.y < recycleThreshold) {
+                    obj.position.y = yOffset + ySpread / 2;
+                    obj.position.x = (Math.random() - 0.5) * xSpread;
+                    obj.position.z = (Math.random() - 0.5) * zSpread;
                 }
 
-                // Recompose the matrix from the updated properties.
+                // Update the dummy object and the instance matrix
+                dummy.position.copy(obj.position);
+                dummy.rotation.copy(obj.rotation);
+                dummy.scale.set(obj.scale, obj.scale, obj.scale);
                 dummy.updateMatrix();
-
-                // Set the new matrix for the instance.
                 instancedMesh.setMatrixAt(i, dummy.matrix);
             }
             // Tell Three.js that the matrices need to be updated on the GPU.
@@ -267,14 +280,17 @@ gltfLoader.load(
 //             // Update position (make it fall).
 //             dummy.position.y -= 0.02; // Adjust this value for fall speed.
 
-//             // Update rotation.
-//             dummy.rotation.x += 0.005;
-//             dummy.rotation.z += 0.005;
+//             // Update rotation - Set rotation based on elapsed time for smooth animation
+//             dummy.rotation.x = elapsedTime * 0.3;
+//             dummy.rotation.z = elapsedTime * 0.3;
+
 
 //             // Check if object is off-screen (recycling).
-//             if (dummy.position.y < -15) {
-//                 dummy.position.y = 15; // Reset to the top.
-//                 dummy.position.x = (Math.random() - 0.5) * 30; // Re-randomize horizontal position.
+//             const recycleThreshold = yOffset - ySpread / 2 - 10; // Adjusted for offset
+//             if (dummy.position.y < recycleThreshold) {
+//                 dummy.position.y = yOffset + ySpread / 2; // Reset to top of spread area
+//                 dummy.position.x = (Math.random() - 0.5) * xSpread; // Re-randomize horizontal position
+//                 dummy.position.z = (Math.random() - 0.5) * zSpread; // Re-randomize depth position
 //             }
 
 //             // Recompose the matrix from the updated properties.
@@ -285,14 +301,17 @@ gltfLoader.load(
 //         }
 //         // Tell Three.js that the matrices need to be updated on the GPU.
 //         instancedMesh.instanceMatrix.needsUpdate = true;
+
+//         // Update the controls
+//         controls.update();
+
+//         // Render the scene with the updated camera.
+//         renderer.render(scene, camera);
+//         labelRenderer.render(scene, camera);
+
+//         // Call animate again on the next frame.
+//         window.requestAnimationFrame(animate);
 //     }
-
-
-//     // Render the scene with the updated camera.
-//     renderer.render(scene, camera);
-
-//     // Call animate again on the next frame.
-//     window.requestAnimationFrame(animate);
 // };
 
 

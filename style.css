@@ -1,0 +1,19 @@
+body {
+    margin: 0;
+    overflow: hidden; /* Hide scrollbars */
+}
+.webgl {
+    position: fixed;
+    top: 0;
+    left: 0;
+    outline: none;
+}
+
+.label {
+    color: #ffffff;
+    font-family: sans-serif;
+    padding: 2px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    font-size: 14px;
+}
